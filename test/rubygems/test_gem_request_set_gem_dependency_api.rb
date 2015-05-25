@@ -52,22 +52,14 @@ class TestGemRequestSetGemDependencyAPI < Gem::TestCase
   end
 
   def test_gempspec_with_multiple_runtime_deps
-    gda = Class.new(@GDA) do
-      # implement find_gemspec so we don't need one on the FS
-      def find_gemspec name, path
-        Gem::Specification.new do |s|
-          s.name = 'foo'
-          s.version = '1.0'
-          s.add_runtime_dependency 'bar', '>= 1.6.0', '< 1.6.4'
-        end
-      end
+    save_gemspec 'foo', '1.0' do |s|
+      s.add_runtime_dependency 'bar', '>= 1.6.0', '< 1.6.4'
     end
-    instance = gda.new @set, __FILE__
-    instance.gemspec
+    @gda.gemspec
     assert_equal %w{ foo bar }.sort, @set.dependencies.map(&:name).sort
     bar = @set.dependencies.find { |d| d.name == 'bar' }
-    assert_equal [[">=", Gem::Version.create('1.6.0')],
-                  ["<", Gem::Version.create('1.6.4')]], bar.requirement.requirements
+    assert_equal [["<", Gem::Version.create('1.6.4')],
+                  [">=", Gem::Version.create('1.6.0')]], bar.requirement.requirements.sort
   end
 
   def test_gemspec_without_group
@@ -471,11 +463,9 @@ class TestGemRequestSetGemDependencyAPI < Gem::TestCase
   end
 
   def test_gemspec
-    spec = util_spec 'a', 1, 'b' => 2
-    spec.add_development_dependency 'c', 3
-
-    open 'a.gemspec', 'w' do |io|
-      io.write spec.to_ruby_for_cache
+    save_gemspec 'a', 1 do |s|
+      s.add_dependency 'b', 2
+      s.add_development_dependency 'c', 3
     end
 
     @gda.gemspec
@@ -507,11 +497,9 @@ class TestGemRequestSetGemDependencyAPI < Gem::TestCase
   end
 
   def test_gemspec_development_group
-    spec = util_spec 'a', 1, 'b' => 2
-    spec.add_development_dependency 'c', 3
-
-    open 'a.gemspec', 'w' do |io|
-      io.write spec.to_ruby_for_cache
+    save_gemspec 'a', 1 do |s|
+      s.add_dependency 'b', 2
+      s.add_development_dependency 'c', 3
     end
 
     @gda.without_groups << :other
@@ -524,14 +512,12 @@ class TestGemRequestSetGemDependencyAPI < Gem::TestCase
   end
 
   def test_gemspec_multiple
-    open 'a.gemspec', 'w' do |io|
-      spec = util_spec 'a', 1, 'b' => 2
-      io.write spec.to_ruby_for_cache
+    save_gemspec 'a', 1 do |s|
+      s.add_dependency 'b', 2
     end
 
-    open 'b.gemspec', 'w' do |io|
-      spec = util_spec 'b', 2, 'c' => 3
-      io.write spec.to_ruby_for_cache
+    save_gemspec 'b', 2 do |s|
+      s.add_dependency 'c', 3
     end
 
     e = assert_raises ArgumentError do
@@ -542,14 +528,12 @@ class TestGemRequestSetGemDependencyAPI < Gem::TestCase
   end
 
   def test_gemspec_name
-    open 'a.gemspec', 'w' do |io|
-      spec = util_spec 'a', 1, 'b' => 2
-      io.write spec.to_ruby_for_cache
+    save_gemspec 'a', 1 do |s|
+      s.add_dependency 'b', 2
     end
 
-    open 'b.gemspec', 'w' do |io|
-      spec = util_spec 'b', 2, 'c' => 3
-      io.write spec.to_ruby_for_cache
+    save_gemspec 'b', 2 do |s|
+      s.add_dependency 'c', 3
     end
 
     @gda.gemspec :name => 'b'
@@ -558,10 +542,8 @@ class TestGemRequestSetGemDependencyAPI < Gem::TestCase
   end
 
   def test_gemspec_named
-    spec = util_spec 'a', 1, 'b' => 2
-
-    open 'other.gemspec', 'w' do |io|
-      io.write spec.to_ruby_for_cache
+    save_gemspec 'a', 1 do |s|
+      s.add_dependency 'b', 2
     end
 
     @gda.gemspec
@@ -578,12 +560,10 @@ class TestGemRequestSetGemDependencyAPI < Gem::TestCase
   end
 
   def test_gemspec_path
-    spec = util_spec 'a', 1, 'b' => 2
-
     FileUtils.mkdir 'other'
 
-    open 'other/a.gemspec', 'w' do |io|
-      io.write spec.to_ruby_for_cache
+    save_gemspec 'a', 1, 'other' do |s|
+      s.add_dependency 'b', 2
     end
 
     @gda.gemspec :path => 'other'
